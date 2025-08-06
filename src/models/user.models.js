@@ -1,6 +1,7 @@
 import { model, Schema } from "mongoose";
 import { ArrayUserRole, UserRoleEnum } from "../utils/constent.js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const userSchema = new Schema(
   {
@@ -67,7 +68,7 @@ const userSchema = new Schema(
     resetVerificationToken: String,
     resetVerificationExpiry: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.pre("save", async function () {
@@ -77,6 +78,18 @@ userSchema.pre("save", async function () {
 
 userSchema.methods.isCorrectPassword = async function (password) {
   return await bcrypt.compare(password, this.password);
+};
+
+userSchema.methods.generateVerificationToken = async function () {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiry = Date.now() + 10 * 60 * 1000;
+
+  this.verificationToken = token;
+  this.verificationExpiry = expiry;
+
+  await this.save();
+  
+  return token;
 };
 
 const User = model("User", userSchema);
