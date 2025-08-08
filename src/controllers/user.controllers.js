@@ -4,6 +4,7 @@ import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import fileUploader from "../utils/cloudinary.js";
 import sendingEmail from "../utils/sendingMail.js";
+import crypto from "crypto";
 
 const userRegister = asyncHandler(async (req, res) => {
   const { fullname, username, email, password } = req.body;
@@ -51,18 +52,172 @@ const userRegister = asyncHandler(async (req, res) => {
 
 const updateAvatar = asyncHandler(async (req, res) => {
   const avatarFilePath = req.file?.path;
-  if (!avatarFilePath) throw new ApiError(400, "Avatar is requried");
+  if (!avatarFilePath) throw new ApiError(400, "Avatar file is required");
 
-  const response = fileUploader(avatarFilePath)
-  .catch((err) => {
-    throw new ApiError(500, "File uploading error :-", err.message);
-  });
+  const response = await fileUploader(avatarFilePath);
+  if (!response) throw new ApiError(500, "Avatar not uploaded");
 
-  console.log(response)
+  const userId = req.user._id;
 
-  return res.status(200).json(
-    new ApiResponse(200, "Avatar Uploaded Successfully")
-  )
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { avatar: { url: response.url } },
+    { new: true },
+  ).select("-password -refershToken");
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, "Avatar updated successfully", updatedUser));
 });
 
-export { userRegister, updateAvatar };
+const verify = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  if (!token) throw new ApiError(400, "Token is requried");
+
+  const user = await User.findOneAndUpdate(
+    {
+      $and: [
+        { verificationToken: token },
+        { verificationExpiry: { $gte: Date.now() } },
+      ],
+    },
+    {
+      verificationExpiry: undefined,
+      verificationToken: undefined,
+      isVerified: true,
+    },
+    { new: true },
+  ).select("-password");
+
+  if (!user) throw new ApiError(401, "Token and expiry not matched");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Email verification successfully", user));
+});
+
+const userLogin = asyncHandler(async (req, res) => {
+  const { email, password, username } = req.body;
+  if (!(email || username) || !password)
+    throw new ApiError(400, "All fields are required");
+
+  const user = await User.findOne({ $or: [{ email }, { user }] });
+  if (!user) throw new ApiError(404, "User not found");
+
+  const isMatch = user.isCorrectPassword(password);
+  if (!isMatch)
+    throw new ApiError(403, "Password is invalid", email ? email : username);
+
+  const accessToken = user.generateAccessToken();
+  const refershToken = user.generateRefershToken();
+
+  await user.save();
+
+  user.password = undefined;
+  user.refershToken = undefined;
+
+  res.cookie("accessToken", accessToken, {
+    httpOnlt: true,
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+
+  return res
+    .cookie("refershToken", refershToken, {
+      httpOnlt: true,
+      maxAge: 15 * 24 * 60 * 60 * 1000,
+    })
+    .status(200)
+    .json(ApiResponse(200, "User login successfully", user));
+});
+
+const userLogout = asyncHandler(async (req, res) => {
+  res.cookie("accessToken", "");
+
+  res
+    .cookie("refershToken", "")
+    .status(200)
+    .json(ApiResponse(200, "User logout successfully", req.user.fullname));
+});
+
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) throw new ApiError(400, "Email id is requried");
+
+  const user = await User.findOne({ email }).select("-password -refershToken");
+  if (!user) throw new ApiError(404, `${email} for this user not found`);
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const updatedUser = await User.findByIdAndUpdate(
+    User._id,
+
+    {
+      resetVerificationExpiry: Date.now() + 10 * 60 * 1000,
+      resetVerificationToken: token,
+    },
+
+    { new: true },
+  ).select("-password -refershToken");
+
+  const options = {
+    name: user.fullname,
+    subject: "Reset Password",
+    email: user.email,
+    url: `${process.env.BASE_URL}/api/v1/users/reset-password/${token}`,
+  };
+
+  await sendingEmail(options);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Forgot password successfuly", updatedUser));
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+  if (!token || !password) new ApiError(400, "Password and token are required");
+
+  const user = await findOneAndUpdate(
+    {
+      $and: [
+        { resetVerificationToken: token },
+        { resetVerificationExpiry: { $gte: Date.now() } },
+      ],
+    },
+
+    {
+      resetVerificationToken: undefined,
+      resetVerificationExpiry: undefined,
+      password,
+    },
+
+    { new: true },
+  ).select("-password -refershToken");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Reset Password Successfully", user));
+});
+
+const getProfile = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const user = await User.findById(userId).select("-password -refershToken");
+  if (!user) throw new ApiError(401, "User not loggedin");
+
+  return res
+    .status(200)
+    .json(ApiResponse(200, "Get profile successfully", user));
+});
+
+export {
+  userRegister,
+  updateAvatar,
+  verify,
+  userLogin,
+  userLogout,
+  forgotPassword,
+  resetPassword,
+  getProfile,
+};

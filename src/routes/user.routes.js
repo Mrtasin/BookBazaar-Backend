@@ -1,9 +1,35 @@
 import { Router } from "express";
 import upload from "../middlewares/multer.middlewares.js";
-import { updateAvatar, userRegister } from "../controllers/user.controllers.js";
+import {
+  forgotPassword,
+  getProfile,
+  resetPassword,
+  updateAvatar,
+  userLogin,
+  userLogout,
+  userRegister,
+  verify,
+} from "../controllers/user.controllers.js";
+import isLoggedIn from "../middlewares/user.middlewares.js";
+
 const userRoutes = Router();
 
 userRoutes.route("/register").post(upload.single("avatar"), userRegister);
-userRoutes.route("/update-avatar").post(upload.single("avatar"), updateAvatar);
+
+userRoutes.route("/login").post(userLogin);
+
+userRoutes.route("/logout").get(isLoggedIn, userLogout);
+
+userRoutes.route("/me").get(isLoggedIn, getProfile);
+
+userRoutes.route("/verify/:token").put(verify);
+
+userRoutes.route("/forgot-password").put(forgotPassword);
+
+userRoutes.route("/reset-password/:token").put(resetPassword);
+
+userRoutes
+  .route("/update-avatar")
+  .put(isLoggedIn, upload.single("avatar"), updateAvatar);
 
 export default userRoutes;

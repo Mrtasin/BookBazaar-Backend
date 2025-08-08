@@ -2,6 +2,7 @@ import { model, Schema } from "mongoose";
 import { ArrayUserRole, UserRoleEnum } from "../utils/constent.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 
 const userSchema = new Schema(
   {
@@ -80,6 +81,33 @@ userSchema.methods.isCorrectPassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
+userSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+      fullname: this.fullname,
+      email: this.email,
+      username: this.username,
+    },
+
+    process.env.ACCESS_TOKEN_SECRET,
+
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY },
+  );
+};
+
+userSchema.methods.generateRefershToken = function () {
+  const token = jwt.sign(
+    { _id: this._id },
+
+    process.env.REFRESH_TOKEN_SECRET,
+
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY },
+  );
+  this.refershToken = token;
+  return token;
+};
+
 userSchema.methods.generateVerificationToken = async function () {
   const token = crypto.randomBytes(32).toString("hex");
   const expiry = Date.now() + 10 * 60 * 1000;
@@ -88,7 +116,7 @@ userSchema.methods.generateVerificationToken = async function () {
   this.verificationExpiry = expiry;
 
   await this.save();
-  
+
   return token;
 };
 
