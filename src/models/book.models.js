@@ -24,7 +24,6 @@ const bookSchema = new Schema(
 
     book_no: {
       type: String,
-      required: true,
       unique: true,
     },
 
@@ -42,9 +41,14 @@ const bookSchema = new Schema(
       type: Number,
       required: true,
     },
+    coverImage: {
+      type: String,
+      required: true,
+    },
     createdBy: {
       type: mongoose.Types.ObjectId,
       ref: "User",
+      required: true,
     },
   },
   { timestamps: true },
