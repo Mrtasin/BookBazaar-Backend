@@ -22,11 +22,11 @@ userRoutes.route("/logout").get(isLoggedIn, userLogout);
 
 userRoutes.route("/me").get(isLoggedIn, getProfile);
 
-userRoutes.route("/verify/:token").put(verify);
+userRoutes.route("/verify/:token").post(verify);
 
-userRoutes.route("/forgot-password").put(forgotPassword);
+userRoutes.route("/forgot-password").post(forgotPassword);
 
-userRoutes.route("/reset-password/:token").put(resetPassword);
+userRoutes.route("/reset-password/:token").post(resetPassword);
 
 userRoutes
   .route("/update-avatar")

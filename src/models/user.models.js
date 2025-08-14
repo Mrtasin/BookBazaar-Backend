@@ -46,8 +46,6 @@ const userSchema = new Schema(
     password: {
       type: String,
       requried: true,
-      minlength: 8,
-      maxlength: 32,
     },
 
     role: {
@@ -61,7 +59,7 @@ const userSchema = new Schema(
       default: false,
     },
 
-    refershToken: String,
+    refreshToken: String,
 
     verificationToken: String,
     verificationExpiry: Date,
@@ -72,9 +70,20 @@ const userSchema = new Schema(
   { timestamps: true },
 );
 
-userSchema.pre("save", async function () {
+userSchema.pre("save", async function (next) {
   if (this.isModified("password"))
     this.password = await bcrypt.hash(this.password, 10);
+
+  next();
+});
+
+userSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  
+  if (update.$set && update.$set.password)
+    update.$set.password = await bcrypt.hash(update.$set.password, 10);
+
+  next();
 });
 
 userSchema.methods.isCorrectPassword = async function (password) {
@@ -96,7 +105,7 @@ userSchema.methods.generateAccessToken = function () {
   );
 };
 
-userSchema.methods.generateRefershToken = function () {
+userSchema.methods.generateRefreshToken = function () {
   const token = jwt.sign(
     { _id: this._id },
 
@@ -104,7 +113,7 @@ userSchema.methods.generateRefershToken = function () {
 
     { expiresIn: process.env.REFRESH_TOKEN_EXPIRY },
   );
-  this.refershToken = token;
+  this.refreshToken = token;
   return token;
 };
 

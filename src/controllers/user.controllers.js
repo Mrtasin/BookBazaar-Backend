@@ -61,9 +61,9 @@ const updateAvatar = asyncHandler(async (req, res) => {
 
   const updatedUser = await User.findByIdAndUpdate(
     userId,
-    { avatar: { url: response.url } },
+    { $set: { "avatar.url": response.url } },
     { new: true },
-  ).select("-password -refershToken");
+  ).select("-password -refreshToken");
 
   res
     .status(200)
@@ -82,9 +82,8 @@ const verify = asyncHandler(async (req, res) => {
       ],
     },
     {
-      verificationExpiry: undefined,
-      verificationToken: undefined,
-      isVerified: true,
+      $unset: { verificationExpiry: 1, verificationToken: 1 },
+      $set: { isVerified: true },
     },
     { new: true },
   ).select("-password");
@@ -101,20 +100,20 @@ const userLogin = asyncHandler(async (req, res) => {
   if (!(email || username) || !password)
     throw new ApiError(400, "All fields are required");
 
-  const user = await User.findOne({ $or: [{ email }, { user }] });
+  const user = await User.findOne({ $or: [{ email }, { username }] });
   if (!user) throw new ApiError(404, "User not found");
 
-  const isMatch = user.isCorrectPassword(password);
+  const isMatch = await user.isCorrectPassword(password);
   if (!isMatch)
     throw new ApiError(403, "Password is invalid", email ? email : username);
 
   const accessToken = user.generateAccessToken();
-  const refershToken = user.generateRefershToken();
+  const refreshToken = user.generateRefreshToken();
 
   await user.save();
 
   user.password = undefined;
-  user.refershToken = undefined;
+  user.refreshToken = undefined;
 
   res.cookie("accessToken", accessToken, {
     httpOnlt: true,
@@ -122,42 +121,46 @@ const userLogin = asyncHandler(async (req, res) => {
   });
 
   return res
-    .cookie("refershToken", refershToken, {
+    .cookie("refreshToken", refreshToken, {
       httpOnlt: true,
       maxAge: 15 * 24 * 60 * 60 * 1000,
     })
     .status(200)
-    .json(ApiResponse(200, "User login successfully", user));
+    .json(new ApiResponse(200, "User login successfully", user));
 });
 
 const userLogout = asyncHandler(async (req, res) => {
   res.cookie("accessToken", "");
 
   res
-    .cookie("refershToken", "")
+    .cookie("refreshToken", "")
     .status(200)
-    .json(ApiResponse(200, "User logout successfully", req.user.fullname));
+    .json(new ApiResponse(200, "User logout successfully", req.user.fullname));
 });
 
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) throw new ApiError(400, "Email id is requried");
 
-  const user = await User.findOne({ email }).select("-password -refershToken");
+  const user = await User.findOne({ email }).select("-password -refreshToken");
   if (!user) throw new ApiError(404, `${email} for this user not found`);
 
   const token = crypto.randomBytes(32).toString("hex");
 
   const updatedUser = await User.findByIdAndUpdate(
-    User._id,
+    user._id,
 
     {
-      resetVerificationExpiry: Date.now() + 10 * 60 * 1000,
-      resetVerificationToken: token,
+      $set: {
+        resetVerificationExpiry: Date.now() + 10 * 60 * 1000,
+        resetVerificationToken: token,
+      },
     },
 
     { new: true },
-  ).select("-password -refershToken");
+  ).select("-password -refreshToken");
+
+  if (!updatedUser) throw new ApiError(500, "User not updated");
 
   const options = {
     name: user.fullname,
@@ -178,7 +181,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   const { password } = req.body;
   if (!token || !password) new ApiError(400, "Password and token are required");
 
-  const user = await findOneAndUpdate(
+  const user = await User.findOneAndUpdate(
     {
       $and: [
         { resetVerificationToken: token },
@@ -187,13 +190,14 @@ const resetPassword = asyncHandler(async (req, res) => {
     },
 
     {
-      resetVerificationToken: undefined,
-      resetVerificationExpiry: undefined,
-      password,
+      $unset: { resetVerificationToken: 1, resetVerificationExpiry: 1 },
+      $set: { password:password },
     },
 
     { new: true },
-  ).select("-password -refershToken");
+  ).select("-password -refreshToken");
+
+  if (!user) throw new ApiError(401, "Token and expiry not matched");
 
   return res
     .status(200)
@@ -203,12 +207,12 @@ const resetPassword = asyncHandler(async (req, res) => {
 const getProfile = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
-  const user = await User.findById(userId).select("-password -refershToken");
+  const user = await User.findById(userId).select("-password -refreshToken");
   if (!user) throw new ApiError(401, "User not loggedin");
 
   return res
     .status(200)
-    .json(ApiResponse(200, "Get profile successfully", user));
+    .json(new ApiResponse(200, "Get profile successfully", user));
 });
 
 export {

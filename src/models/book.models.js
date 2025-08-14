@@ -1,4 +1,5 @@
-import mongoose, { model, Schema } from "mongoose";
+import { model, Schema } from "mongoose";
+
 const bookSchema = new Schema(
   {
     title: {
@@ -41,12 +42,14 @@ const bookSchema = new Schema(
       type: Number,
       required: true,
     },
+
     coverImage: {
       type: String,
       required: true,
     },
+    
     createdBy: {
-      type: mongoose.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },

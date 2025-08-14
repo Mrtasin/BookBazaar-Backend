@@ -109,7 +109,7 @@ const deleteBook = asyncHandler(async (req, res) => {
 
   const deletedBook = await Book.findByIdAndDelete(id);
   if (!deletedBook) throw new ApiError(500, "Book not deleted");
-  
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Book deleted successfully", deletedBook));
