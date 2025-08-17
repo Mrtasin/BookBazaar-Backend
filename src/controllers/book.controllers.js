@@ -5,18 +5,11 @@ import Book from "../models/book.models.js";
 import fileUploader from "../utils/cloudinary.js";
 
 const addBook = asyncHandler(async (req, res) => {
-  const {
-    title,
-    author,
-    description,
-    price,
-    quantity,
-    published_date,
-    book_no,
-  } = req.body;
+  const { title, author, description, price, quantity, published_date } =
+    req.body;
 
   if (
-    [title, author, description, price, quantity, published_date, book_no].some(
+    [title, author, description, price, quantity, published_date].some(
       (value) => !value,
     )
   )
@@ -36,7 +29,6 @@ const addBook = asyncHandler(async (req, res) => {
     price,
     stock_quantity: quantity,
     published_date,
-    book_no,
     coverImage: response.url,
     createdBy: req.user._id,
   });
@@ -49,7 +41,10 @@ const addBook = asyncHandler(async (req, res) => {
 });
 
 const getAllBooks = asyncHandler(async (req, res) => {
-  const books = await Book.find().populate("createdBy", "fullname email");
+  const books = await Book.find().populate("createdBy", "fullname email role");
+
+  if (!books) throw new ApiError(404, "No books found");
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Books fetched successfully", books));
@@ -59,7 +54,10 @@ const getBookById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!id) throw new ApiError(400, "Book Id is required");
 
-  const book = await Book.findById(id).populate("createdBy", "fullname email");
+  const book = await Book.findById(id).populate(
+    "createdBy",
+    "fullname email role",
+  );
   if (!book) throw new ApiError(404, "Book not found by this Id");
 
   return res
@@ -71,15 +69,8 @@ const updateBook = asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!id) throw new ApiError(400, "Book Id is required");
 
-  const {
-    title,
-    author,
-    description,
-    price,
-    quantity,
-    published_date,
-    book_no,
-  } = req.body;
+  const { title, author, description, price, quantity, published_date } =
+    req.body;
 
   const book = await Book.findByIdAndUpdate(
     id,
@@ -90,7 +81,6 @@ const updateBook = asyncHandler(async (req, res) => {
       price,
       stock_quantity: quantity,
       published_date,
-      book_no,
       createdBy: req.user._id,
     },
     { new: true },

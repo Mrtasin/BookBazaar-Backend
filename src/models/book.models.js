@@ -23,11 +23,6 @@ const bookSchema = new Schema(
       required: true,
     },
 
-    book_no: {
-      type: String,
-      unique: true,
-    },
-
     published_date: {
       type: Date,
       required: true,
@@ -47,7 +42,7 @@ const bookSchema = new Schema(
       type: String,
       required: true,
     },
-    
+
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

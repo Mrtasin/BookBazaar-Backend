@@ -2,6 +2,7 @@ import express from "express";
 import userRoutes from "./routes/user.routes.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import bookRoutes from "./routes/book.routes.js";
 
 const app = express();
 
@@ -18,5 +19,6 @@ app.use(
 );
 
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/books", bookRoutes);
 
 export default app;
