@@ -12,3 +12,13 @@ export const ratingEnum = {
   5: 5,
 };
 export const ArrayRating = Object.values(ratingEnum);
+
+export const orderStatus = {
+  PENDING: "Pending",
+  PROCESSING: "Processing",
+  SHIPPED: "Shipped",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+};
+
+export const ArrayOrderStatus = Object.values(orderStatus);
